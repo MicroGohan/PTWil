@@ -21,8 +21,8 @@ const WheelComponent = () => {
   const [startAngle, setStartAngle] = useState(0);
   const [startRotation, setStartRotation] = useState(0);
 
-  const rawAngle = useMotionValue(0); // valor crudo
-  const angle = useSpring(rawAngle, { damping: 100, stiffness: 999, mass: 1 }); // suavizado
+  const rawAngle = useMotionValue(0);
+  const angle = useSpring(rawAngle, { damping: 100, stiffness: 999, mass: 1 });
 
   const outerSize = 1000;
   const redCircleSize = 650;
@@ -68,14 +68,23 @@ const WheelComponent = () => {
   const handleMouseUp = () => {
     setIsDragging(false);
     const snapAngle = getNearestSnapAngle();
-    rawAngle.set(snapAngle, true); // o usá animate para más suavidad
+    rawAngle.set(snapAngle, true);
   };
 
   // Drag touch
   const handleTouchStart = (e) => {
     const touch = e.touches[0];
     const rect = wheelRef.current.getBoundingClientRect();
-    setCenter({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    setCenter({ x: centerX, y: centerY });
+
+    const dx = touch.clientX - centerX;
+    const dy = touch.clientY - centerY;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+    setStartAngle(angle);
+    setStartRotation(rawAngle.get());
     setIsDragging(true);
   };
 
@@ -84,8 +93,10 @@ const WheelComponent = () => {
     const touch = e.touches[0];
     const dx = touch.clientX - center.x;
     const dy = touch.clientY - center.y;
-    const newAngle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-    rawAngle.set(newAngle);
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+    const delta = angle - startAngle;
+    rawAngle.set(startRotation + delta);
   };
 
   const handleTouchEnd = () => {
@@ -105,16 +116,12 @@ const WheelComponent = () => {
     const x = useTransform(theta, (t) => Math.cos(t) * markRadius);
     const y = useTransform(theta, (t) => Math.sin(t) * markRadius);
 
-    // Para saber cuál está más arriba
     const cosOffset = useTransform(theta, (t) => Math.cos(t + Math.PI / 2));
 
-    // Escala más notoria (hasta 1.5x si está arriba)
     const scale = useTransform(cosOffset, (c) => 1 + 1.5 * c);
 
-    // Opacidad suave (de 0.4 a 1)
     const opacity = useTransform(cosOffset, (c) => 0.4 + 0.6 * c);
 
-    // Z-index dinámico para que el de arriba esté más visible
     const zIndex = useTransform(cosOffset, (c) => Math.round(20 + c * 10));
 
     return (
@@ -138,8 +145,8 @@ const WheelComponent = () => {
           <img
             src={img}
             alt={`card ${i}`}
-            className="w-full h-3/4 object-cover" // ✅ Quitamos rounded-t-xl
-            style={{ borderRadius: '0px' }}      // ✅ Fuerza sin esquinas redondeadas
+            className="w-full h-3/4 object-cover"
+            style={{ borderRadius: '0px' }}
             draggable={false}
           />
           <div className="w-full text-center py-1 font-bold text-xs">{titles[i]}</div>
@@ -199,7 +206,7 @@ const WheelComponent = () => {
 
       {/* Fondo gris tras la llanta */}
       <div
-        className="absolute rounded-full bg-black-300"
+        className="absolute rounded-full bg-black"
         style={{
           width: wheelSize,
           height: wheelSize,
@@ -220,7 +227,7 @@ const WheelComponent = () => {
           left: `calc(50% - ${wheelSize / 2}px)`,
           top: `calc(50% - ${wheelSize / 2}px)`,
           zIndex: 5,
-          rotate: angle, // <-- así sí gira
+          rotate: angle,
         }}
         transition={{ type: 'tween', duration: 0.5, ease: 'easeInOut' }}
         draggable={false}
